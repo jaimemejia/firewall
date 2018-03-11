@@ -1,0 +1,119 @@
+#!/bin/bash
+#Firewall elaborado con iptables por Jaime Ernesto Mejía Calderón - MC13007
+
+#Función para iniciar el filtrado
+function start(){
+  echo "Iniciando firewall..."
+  #Limpiando reglas del Kernel
+    flush
+  #Habilitando el reenvio de paquetes entre interfaces
+    echo "1" > /proc/sys/net/ipv4/ip_forward
+  #Establecimiento de politica: "Aceptar"
+    iptables -P INPUT ACCEPT
+    iptables -P OUTPUT ACCEPT
+    iptables -P FORWARD ACCEPT
+    iptables -t nat -P PREROUTING ACCEPT
+    iptables -t nat -P POSTROUTING ACCEPT
+
+  #Habilitación de localhost
+  iptables -A INPUT -i lo -j ACCEPT
+
+  #1.Brindar acceso a Internet a la red privada establecida.
+    iptables -t nat -A POSTROUTING -s 192.168.50.0/24 -o wlp3s0 -j MASQUERADE
+  #2.Permitir el acceso al propio equipo para que los usuarios hagan uso del DNS.
+    iptables -A INPUT -s 192.168.50.0/24 -p tcp --dport 53 -j ACCEPT
+    iptables -A INPUT -s 192.168.50.0/24 -p udp --dport 53 -j ACCEPT
+  #3.Permitir el acceso al propio equipo para que los usuarios hagan uso del HTTP
+    iptables -A INPUT -s 192.168.50.0/24 -p tcp --dport 80 -j ACCEPT
+  #4.Permitir el acceso al propio equipo para que los usuarios hagan uso del POSTGRESQL
+    iptables -A INPUT -s 192.168.50.0/24 -p tcp --dport 5432 -j ACCEPT
+  #Cerrando accesos INPUT
+    iptables -A INPUT -s 0.0.0.0/0 -p all -j DROP
+  #5.Permitir que la red privada tenga acceso al protocolo HTTP y HTTPS hacia la red pública externa.
+    #iptables -A FORWARD -s 192.168.50.0/24 -i enp2s0 -p tcp --dport 80 -j ACCEPT
+    iptables -A FORWARD -s 192.168.50.0/24 -p tcp --dport 80 -j ACCEPT
+    iptables -A FORWARD -s 192.168.50.0/24 -p tcp --dport 443 -j ACCEPT
+  #6.Permitir que la red privada tenga acceso al protocolo DNS hacia la red pública externa.
+    iptables -A FORWARD -s 192.168.50.0/24 -p tcp --dport 53 -j ACCEPT
+    iptables -A FORWARD -s 192.168.50.0/24 -p udp --dport 53 -j ACCEPT
+  #7.Permitir que la red privada tenga acceso al protocolo FTP hacia la red pública externa.
+    iptables -A FORWARD -s 192.168.50.0/24 -p tcp --dport 21 -j ACCEPT
+    iptables -A FORWARD -s 192.168.50.0/24 -p tcp --dport 20 -j ACCEPT
+  #8.Permitir que la red privada tenga acceso al protocolo CORREO hacia la red pública externa.
+    #Protocolo POP
+    iptables -A FORWARD -s 192.168.50.0/24 -p tcp --dport 110 -j ACCEPT
+    #Protocolo POP seguro
+    iptables -A FORWARD -s 192.168.50.0/24 -p tcp --dport 995 -j ACCEPT
+    #Protocolo IMAP
+    iptables -A FORWARD -s 192.168.50.0/24 -p tcp --dport 143 -j ACCEPT
+    #Protocolo IMAP seguro
+    iptables -A FORWARD -s 192.168.50.0/24 -p tcp --dport 993 -j ACCEPT
+    #Protocolo SMTP
+    iptables -A FORWARD -s 192.168.50.0/24 -p tcp --dport 25 -j ACCEPT
+    #Protocolo SMTP
+    iptables -A FORWARD -s 192.168.50.0/24 -p tcp --dport 465 -j ACCEPT
+
+  #9.Permitir que la red privada tenga acceso al protocolo WHATSAPP hacia la red pública externa.
+    iptables -A FORWARD -s 192.168.50.0/24 -p tcp --dport 5223 -j ACCEPT
+    iptables -A FORWARD -s 192.168.50.0/24 -p tcp --dport 5228 -j ACCEPT
+    iptables -A FORWARD -s 192.168.50.0/24 -p tcp --dport 4244 -j ACCEPT
+    iptables -A FORWARD -s 192.168.50.0/24 -p tcp --dport 5242 -j ACCEPT
+    iptables -A FORWARD -s 192.168.50.0/24 -p tcp --dport 5222 -j ACCEPT
+  #10.Permitir que la red privada tenga acceso al protocolo WHATSAPP hacia la red pública externa.
+
+  #Se bloquea el acceso a todo lo que no está establecido
+  #iptables -A FORWARD -s 192.168.50.0/24 -i enp2s0 -j DROP
+  iptables -A FORWARD -s 192.168.50.0/24 -j DROP
+
+  echo "Firewall en ejecución, para detenerlo utilice el comando 'firewall stop'."
+}
+
+#FUnción para restablecer filtradove necesario ha
+restart(){
+  echo "Reiniciando firewall..."
+  stop
+  flush
+  start
+  echo "Firewall reiniciado."
+}
+#Función para detener el filtrado
+stop(){
+  echo "Deteniendo firewall..."
+  flush
+  #Deshabilitando el reenvio de paquetes entre interfaces
+  echo "0" > /proc/sys/net/ipv4/ip_forward
+  echo "Firewall detenido."
+
+}
+
+#Función para limpiar las reglas de filtrado del Kernel
+flush(){
+  #Elimina todas las reglas de una cadena o todas las cadenas.(-F)
+  iptables --flush
+  #Elimina una cadena especificada por el usuario.(-X)
+  iptables --delete-chain
+  #Coloca en cero los contadores de una cadena o todas las cadenas (-Z)
+  iptables --zero
+  #Elimina todas las reglas de una cadena o todas las cadenas de la tabla nat
+  iptables --table nat --flush
+}
+
+#Función para configurar interfaz fisica enp2s0
+
+
+#Se reciben argumentos desde la terminal
+case "$1" in
+  start|START )
+        start
+  ;;
+  restart|RESTART )
+        restart
+  ;;
+  stop|STOP )
+        stop
+  ;;
+  *)
+        echo "Argumentos validos: start, restart y stop"
+        exit 1
+  ;;
+esac
